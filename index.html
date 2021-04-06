@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+</head>
+<style>
+    html, body{
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+canvas{
+  max-width: 100%;
+}
+</style>
+<body>
+    <canvas id="mycanvas"></canvas>
+
+    <script>
+        // 環境變數
+var updateFPS = 30
+var showMouse = true
+var time = 0
+var bgColor = 'black'
+
+// 控制
+var controls = {
+  draw: function(){
+    ctx.fillStyle = 'black'
+    ctx.fillRect(0,0,ww,wh)
+    trees = []
+    trees.push(new Tree())
+  }
+}
+var gui = new dat.GUI()
+// gui.add(controls, 'value', -2,2).step(0.01).onChange(function(value){})
+gui.add(controls, 'draw')
+
+//--------------------------
+// Vec2
+class Vec2{
+  constructor(x,y){
+    this.x = x
+    this.y = y
+  }
+  set(x,y){
+    this.x = x
+    this.y = y
+  }
+  move(x,y){
+    this.x += x
+    this.y += y
+  }
+  add(v){
+    return new Vec2(this.x+v.x, this.y+v.y)
+  }
+  sub(v){
+    return new Vec2(this.x-v.x, this.y-v.y)
+  }
+  mul(s){
+    return new Vec2(this.x*s, this.y*s)
+  }
+  get length(){
+    return Math.sqrt(this.x*this.x + this.y*this.y)
+  }
+  set length(nv){
+    let temp = this.unit.mul(nv)
+    this.set(temp.x,temp.y)
+  }
+  clone(){
+    return new Vec2(this.x ,this.y)
+  }
+  toString(){
+    return `(${this.x}, ${this.y})`
+  }
+  equal(v){
+    return this.x == v.x && this.y == v.y
+  }
+  get angle(){
+    return Math.atan2(this.y, this.x)
+  }
+  get unit(){
+    return this.mul(1/this.length)
+  }
+}
+var a = new Vec2(3,4)
+
+
+//-----------------
+
+var canvas= document.querySelector('#mycanvas')
+var ctx = canvas.getContext('2d')
+
+ctx.circle = function(v,r){
+  this.arc(v.x,v.y,r,0,Math.PI*2)
+}
+ctx.line = function(v1,v2){
+  this.moveTo(v1.x, v1.y)
+  this.lineTo(v2.x, v2.y)
+}
+
+// canvas設定
+function initCanvas(){
+  ww = canvas.width = window.innerWidth
+  wh = canvas.height = window.innerHeight
+}
+initCanvas()
+
+class Tree{
+  constructor(args){
+    let def ={
+      p: new Vec2(0,0),
+      angle: -Math.PI/2,
+      speed: 4,
+      w: 10,
+      time: 0
+    }
+    Object.assign(def,args)
+    Object.assign(this,def)
+  }
+  draw(){
+    if(this.w>0){
+      ctx.beginPath()
+      ctx.arc(this.p.x,this.p.y,this.w,0,Math.PI*2)
+      ctx.fillStyle = 'white'
+      ctx.fill()
+    }
+  }
+  update(){
+    this.time++
+    // x: cos在X分量的質
+    // y: sin在Y分量的質
+    // 然後再用 mul 乘上移動速度
+    this.v = (new Vec2(Math.cos(this.angle),Math.sin(this.angle))).mul(this.speed)
+    
+    // 三角函數應用
+    this.p = this.p.add(this.v).add(new Vec2(Math.sin(this.p.y/10),0))
+    this.w *=Math.random()*0.02+0.98
+    
+    // 分裂條件
+    if(Math.random()<1 + this.w/50 && this.time>15 && this.time%15==0 && this.w>0.5){
+      this.angle+=(Math.random()-0.5)/5
+      // 分枝
+      if(Math.random()<0.5 ){
+        trees.push(new Tree({
+          p: this.p.clone(),
+          angle: this.angle+(Math.random()-0.5),
+          speed: this.speed/(1.2+Math.random()),
+          w: this.w * (0.45+0.5*Math.random())
+        }))
+      }
+      // 左右長分枝
+      else{
+        trees.push(new Tree({
+          p: this.p.clone(),
+          angle: this.angle+(Math.random()-0.5)/3,
+          speed: this.speed/(1.2+Math.random()),
+          w: this.w * (0.45+0.5*Math.random())
+        }))
+        trees.push(new Tree({
+          p: this.p.clone(),
+          angle: this.angle-(Math.random()-0.5)/3,
+          speed: this.speed/(1.2+Math.random()),
+          w: this.w * (0.45+0.5*Math.random())
+        }))
+        this.w = 0
+      }
+      if(Math.random()<0.3){
+        this.w =0
+      }
+    }
+    if( this.w > 0.1 && this.w<2 && Math.random()<0.1){
+    ctx.beginPath()
+    ctx.arc(this.p.x, this.p.y, Math.random()*4,0,Math.PI*2)
+    ctx.fillStyle = "hsl("+Math.random()*50+",80%,50%)"
+    ctx.fill()
+    }
+}
+  
+  
+}
+// tree為當下第一支樹枝
+var tree,trees = [];
+// 邏輯初始化
+function init(){
+  ctx.fillStyle = 'black'
+  ctx.fillRect(0,0,ww,wh)
+  tree = new Tree({
+    p: new Vec2(0,0),
+    angle: -Math.PI/2
+  })
+  trees.push(tree)
+  
+}
+
+// 遊戲邏輯更新
+function update(){
+  time++
+}
+
+// 畫面更新
+function render(){
+  // 清空背景
+    ctx.fillStyle= bgColor
+    // ctx.fillRect(0,0,ww,wh)
+  // -------
+  // 在這繪製
+  // 下方為例子
+  ctx.save()
+    ctx.translate(ww/2,wh)
+    trees.forEach(tree=>tree.update())
+    trees.forEach(tree=>tree.draw())
+  ctx.restore()
+  
+  
+  
+  
+  //------------
+  // 滑鼠
+  
+//   ctx.fillStyle = 'red'
+//   ctx.beginPath()
+//   ctx.circle(mousePos,3)
+//   ctx.fill()
+  
+//   ctx.save()
+//     ctx.beginPath()  
+//     ctx.translate(mousePos.x, mousePos.y)
+//     ctx.strokeStyle = 'red'
+//     let len = 20
+//     ctx.line(new Vec2(-len,0), new Vec2(len,0))
+  
+//     ctx.fillText(mousePos,10,-10)
+  
+//     ctx.rotate(Math.PI/2)
+//     ctx.line(new Vec2(-len,0), new Vec2(len,0))
+//     ctx.stroke()
+//   ctx.restore()
+  
+  requestAnimationFrame(render)
+}
+
+// 頁面載入
+function loaded(){
+  initCanvas()
+  init()
+  requestAnimationFrame(render)
+  setInterval(update,1000/updateFPS)
+}
+// 載入 縮放的事件
+window.addEventListener('load',loaded)
+window.addEventListener('resize',initCanvas)
+
+// 滑鼠事件跟紀錄
+var mousePos = new Vec2(0,0)
+var mousePosDown = new Vec2(0,0)
+var mousePosUp = new Vec2(0,0)
+window.addEventListener('mousemove',mousemove)
+window.addEventListener('mouseup',mouseup)
+window.addEventListener('mousedown',mousedown)
+
+function mousemove(e){
+  mousePos.set(e.x,e.y)
+  console.log(mousePos)
+}
+function mouseup(e){
+   mousePos.set(e.x,e.y)
+  mousePosUp = mousePos.clone()
+}
+function mousedown(e){
+   mousePos.set(e.x,e.y)
+  mousePosDown = mousePos.clone()
+}
+    </script>
+</body>
+</html>
